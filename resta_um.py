@@ -111,6 +111,10 @@ class Tabuleiro:
             peca_final_no_buraco_inicial {bool} -- Se True será exigido que a solução 
             tenha a peça restante na mesma posição do buraco inicial (default: {True})
         """
+
+        # valor 2 é posição inválida
+        # valor 1 é uma peça
+        # valor 0 é um burcao
         self.tabuleiro = [
             [2, 2, 1, 1, 1, 2, 2],
             [2, 2, 1, 1, 1, 2, 2],
@@ -124,13 +128,15 @@ class Tabuleiro:
         self.remover(self.pos_inicial)
 
         self.pecas_restantes = 32
-        self.peca_final_no_buraco_inicial = True
+        self.peca_final_no_buraco_inicial = peca_final_no_buraco_inicial
+
+        # pilha de movimentos realizados
         self.movimentos = []
 
     def reset(self):
         """ Reseta o jogo
         """
-        self.__init__(self.pos_inicial)
+        self.__init__(self.pos_inicial, self.peca_final_no_buraco_inicial)
 
     def __repr__(self):
         repr_tabuleiro = '   0 1 2 3 4 5 6\n\n'
@@ -145,7 +151,7 @@ class Tabuleiro:
             posicao {tuple} -- (linha, coluna) da posição no tabuleiro
 
         Returns:
-            [int] -- valor da posição solicitada
+            int -- valor da posição solicitada
         """
         return self.tabuleiro[posicao[0]][posicao[1]]
 
@@ -265,9 +271,16 @@ class Tabuleiro:
         self.remover(pos_nova)
         self.set(pos_anterior)
         self.set(peca_saltada)
+
+        # como um movimento foi desfeito, a peça removida por ele voltou
         self.pecas_restantes += 1
     
     def ident(self):
+        """Retorna string de representação do tabuleiro do jogo.
+
+        Returns:
+            str -- representação do tabuleiro do jogo.
+        """
         ident = ''
         for linha in self.tabuleiro:
             for item in linha:
@@ -276,11 +289,55 @@ class Tabuleiro:
 
 
 class SolucionadorResta1:
-    def __init__(self, jogo: Tabuleiro, nao_recursivo = False):
-        self.jogo = jogo
-        self.solucao = []
+    def __init__(self, jogo: Tabuleiro, callback_visualizacao = None):
+        """Inicializa o solucionador para o jogo.
 
-    def solucionar(self, movimentos_realizados = 0):
+        A callback_visualizacao quando chamda recebe como parâmetro a instância 
+        do solucionador.
+        Atenção: a callback_visualizacao não deve alterar qualquer estrutura
+        de dados da instância recebida, para que não cause problemas.
+
+        Arguments:
+            jogo {Tabuleiro} -- tabuleiro do jogo
+
+        Keyword Arguments:
+            callback_visualizacao {function} -- Função que será chamada
+            para cada alteração do tabuleiro. Está função tem assinatura
+            callback_visualizacao(solucionador). (default: {None})
+        """
+        self.jogo = jogo
+        nop = lambda *args: None
+        self.callback_visualizacao = callback_visualizacao or nop
+        self.total_de_movimentos = 0
+        # self.callback_visualizacao(self)
+
+    def solucionar(self, recursivo=True):
+        """Soluciona o jogo se possível.
+
+        Keyword Arguments:
+            recursivo {bool} -- Define se será utilizado o algoritmo recursivo. (default: {True})
+
+        Returns:
+            bool -- Retorna True se encontrar uma solução, False caso contrário.
+        """
+        self.jogo.reset()
+        self.total_de_movimentos = 0
+        if recursivo:
+            return self._solucionar()
+        else:
+            return self._solucionar_nao_recursivo()
+
+    def _solucionar(self, movimentos_realizados = 0):
+        """Tenta solucionar o jogo utilizando backtracking.
+
+        Keyword Arguments:
+            movimentos_realizados {int} -- Numero de movimentos realizados 
+            (deve ser utilizado apenas internamente para verificação da 
+            condição de parada) (default: {0})
+
+        Returns:
+            bool -- True se existe solução, False se não existe solução.
+        """
         if movimentos_realizados == 31:
             if self.jogo.esta_solucionado():
                 return True
@@ -289,15 +346,27 @@ class SolucionadorResta1:
             for direcao in DIRECOES:
                 movimento = Movimento((linha, coluna), direcao)
                 if self.jogo.mover(movimento):
-                    if self.solucionar(movimentos_realizados+1):
-                        self.solucao.append(movimento)
+                    self.callback_visualizacao(self)
+                    self.total_de_movimentos += 1
+                    if self._solucionar(movimentos_realizados+1):
                         return True
-                        
+                    
                     self.jogo.desfazer_movimento()
-
+                    self.callback_visualizacao(self)
+        
+        # retorna False caso tenha tentado todas as possibilidades
+        # e nenhuma solução foi encontrada
         return False
 
-    def solucionar_nao_recursivo(self):
+    def _solucionar_nao_recursivo(self):
+        """Tenta solucionar o jogo utilizando backtracking sem o uso de recursão.
+
+        Returns:
+            bool -- True se existe solução, False se não existe solução.
+        """
+        # mantém uma pilha de movimentos váilidos para cada estado visitado,
+        # quando a pilha fica vazia significa que todos os movimentos 
+        # para aquele estado foram visitados
         estados = {}
         id_inicial = self.jogo.ident()
         estados[id_inicial] = {'visitados': [], 'movimentos': self.jogo.get_movimentos_validos()}
@@ -310,10 +379,13 @@ class SolucionadorResta1:
             else:
                 self.jogo.desfazer_movimento()
                 movimentos_realizados-=1
+                self.callback_visualizacao(self)
                 continue
 
             if self.jogo.mover(movimento):
-                id_jogo = jogo.ident()
+                self.total_de_movimentos += 1
+                self.callback_visualizacao(self)
+                id_jogo = self.jogo.ident()
 
                 movimentos_realizados+=1
                 if movimentos_realizados == 31:
@@ -325,26 +397,30 @@ class SolucionadorResta1:
                 else:
                     estados[id_jogo]['visitados'].append(movimento)
 
+        # retorna False caso tenha tendado todas as possibilidades
+        # e nenhuma solução foi encontrada
         return False
 
+if __name__ == "__main__":
+    jogo = Tabuleiro()
 
-jogo = Tabuleiro()
-
-s_time = time.time()
-try:
+    tempo_inicio = time.time()
     solucao = False
     solver = SolucionadorResta1(jogo)
-    # solucinador.solucionar()
-    solver.solucionar_nao_recursivo()
-    solucao = jogo.movimentos
-finally:
-    e_time = time.time()
-    print(f"{e_time - s_time} secs")
-    print(jogo.pecas_restantes)
-    if solucao:
-        for mov in solucao:
+    print("Por favor aguarde!")
+    tem_solucao = solver.solucionar()
+    # tem_solucao = solver.solucionar(False)
+
+    print(f"Tempo de execução: {time.time() - tempo_inicio} secs")
+    print("Solução: ")
+    if tem_solucao:
+        for mov in jogo.movimentos:
+            # mapeia N, S, L, O para cima, baixo, direita, esquerda
             mov = str(mov).replace('N', 'cima')
-            mov = str(mov).replace('O', 'esq')
-            mov = str(mov).replace('L', 'dir')
             mov = str(mov).replace('S', 'baixo')
+            mov = str(mov).replace('L', 'direita')
+            mov = str(mov).replace('O', 'esquerda')
             print(str(mov))
+        print(f"Total de movimentos válidos realizados para alcançar a solução: {solver.total_de_movimentos}")
+    else:
+        print("Este jogo não tem solução.")
