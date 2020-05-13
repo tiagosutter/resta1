@@ -1,6 +1,6 @@
 import time
 
-'''
+"""
      N
      ^
      |
@@ -10,13 +10,16 @@ O <--x--> L
      S
     
     DIRECOES = ['O', 'L', 'N', 'S']
-'''
-DIRECOES = ['O', 'L', 'N', 'S'] # ------
+"""
+DIRECOES = ['O', 'L', 'N', 'S']
 
+# Distâncias a qual as peças serão movidas
 DELTAS_MOVER = {'N': -2, 'S': 2, 'O': -2, 'L': 2}
 
+# Distância da peça adjacente (será saltada)
 DELTAS_REMOVER = {'N': -1, 'S': 1, 'O': -1, 'L': 1}
 
+# Lista de coordenadas válidas para o tabuleiro
 COORDS_VALIDAS = (
                     (0, 2), (0, 3), (0, 4),
                     (1, 2), (1, 3), (1, 4),
@@ -29,6 +32,12 @@ COORDS_VALIDAS = (
 
 class Movimento:
     def __init__(self, posicao: tuple, direcao: str):
+        """Inicializa o objeto Movimento.
+
+        Arguments:
+            posicao {tuple} -- Posição da peça que será movida.
+            direcao {str} -- Direção em que a peça será movida.
+        """
         self.posicao = posicao
         self.direcao = direcao
     
@@ -43,6 +52,15 @@ class Movimento:
 
     @property
     def nova_posicao(self):
+        """
+        Retorna a nova posição da peça.
+
+        Caso a coordenada da nova posição da peça seja inválida esta prorpriedade 
+        retornará a própria posição da peça a ser movida.
+
+        Returns:
+            tuple -- (linha, coluna) para onde a peça será movida.
+        """
         if self.direcao == 'N' or self.direcao == 'S':
             pos = self.posicao[0]+DELTAS_MOVER[self.direcao], self.posicao[1]
         else:
@@ -51,6 +69,15 @@ class Movimento:
     
     @property
     def saltada(self):
+        """
+        Retorna a posição da peça que será saltada após o movimento ser realizado.
+
+        Caso a coordenada da peça saltada seja inválida esta prorpriedade retornará
+        a posição da própria peça a ser movida.
+
+        Returns:
+            tuple -- (linha, coluna) da peça saltada.
+        """
         if self.direcao == 'N' or self.direcao == 'S':
             pos = self.posicao[0]+DELTAS_REMOVER[self.direcao], self.posicao[1]
         else:
@@ -58,14 +85,23 @@ class Movimento:
         return self._fix(pos)
     
     def _fix(self, pos):
-        if pos[0] <= -1: pos = (0, pos[1])
-        if pos[1] <= -1: pos = (pos[0], 0)
-        if pos[0] >= 7: pos = (6, pos[1])
-        if pos[1] >= 7: pos = (pos[0], 6)
+        """Faz com que posições fora dos limites sejam colocadas como a mesma
+        que a posição da peça.
+
+        Arguments:
+            pos {tuple} -- Posição a ser verificada
+
+        Returns:
+            tuple -- Nova posição para casos fora dos limites, posição recebida 
+            para casos regulares
+        """
+        if pos not in COORDS_VALIDAS:
+            return self.posicao
         return pos
 
 class Tabuleiro:
-    """Classe que contém tabuleiro e implementa as regras do jogo.
+    """
+    Classe que contém tabuleiro e implementa as regras do jogo.
     """
     def __init__(self, pos_inicial = (3, 3), peca_final_no_buraco_inicial=True):
         """Inicializa o tabuleiro do jogo.
