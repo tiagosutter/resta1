@@ -81,7 +81,9 @@ class Tabuleiro:
         self.remover(self.pos_inicial)
 
     def reset(self):
-        self.__init__()
+        """ Reseta o jogo
+        """
+        self.__init__(self.pos_inicial)
 
     def __repr__(self):
         repr_tabuleiro = '   0 1 2 3 4 5 6\n\n'
@@ -89,13 +91,31 @@ class Tabuleiro:
             repr_tabuleiro += f"{n_linha}  {' '.join([str(pos) for pos in linha]).replace('2', ' ')}\n"
         return repr_tabuleiro
 
-    def get(self, posicao: tuple, dir=None):
+    def get(self, posicao: tuple):
+        """Retorna o elemento do tabuleiro na posição indicada
+
+        Arguments:
+            posicao {tuple} -- (linha, coluna) da posição no tabuleiro
+
+        Returns:
+            [int] -- valor da posição solicitada
+        """
         return self.tabuleiro[posicao[0]][posicao[1]]
 
     def set(self, posicao: tuple):
+        """ Coloca uma peça (valor 1) no tabuleiro na posição especificada.
+
+        Arguments:
+            posicao {tuple} -- (linha, coluna) para inserir a peça
+        """
         self.tabuleiro[posicao[0]][posicao[1]] = 1
 
     def remover(self, posicao: tuple):
+        """Remove uma peça (coloca valor 0) no tabuleiro na posição indicada
+
+        Arguments:
+            posicao {tuple} -- (linha, coluna) da posição que terá a peça removida
+        """
         self.tabuleiro[posicao[0]][posicao[1]] = 0
 
     def _valido(self, movimento):
@@ -160,6 +180,13 @@ class Tabuleiro:
         self.set(pos_anterior)
         self.set(peca_saltada)
         self.pecas_restantes += 1
+    
+    def ident(self):
+        ident = ''
+        for linha in self.tabuleiro:
+            for item in linha:
+                ident += str(item)
+        return ident
 
 
 def solucionar(jogo, movimentos_realizados):
@@ -171,11 +198,40 @@ def solucionar(jogo, movimentos_realizados):
         for direcao in DIRECOES:
             movimento = Movimento((linha, coluna), direcao)
             if jogo.mover(movimento):
-
                 if solucionar(jogo, movimentos_realizados+1):
                     return True
                     
                 jogo.desfazer_movimento()
+
+    return False
+
+def solucionar_nao_recursivo(jogo):
+    estados = {}
+    id_inicial = jogo.ident()
+    estados[id_inicial] = {'visitados': [], 'movimentos': jogo.get_movimentos_validos()}
+    movimentos_realizados = 0
+    while estados[id_inicial]['movimentos']:
+        id_jogo = jogo.ident()
+
+        if estados[id_jogo]['movimentos']:
+            movimento = estados[id_jogo]['movimentos'].pop()
+        else:
+            jogo.desfazer_movimento()
+            movimentos_realizados-=1
+            continue
+
+        if jogo.mover(movimento):
+            id_jogo = jogo.ident()
+
+            movimentos_realizados+=1
+            if movimentos_realizados == 31:
+                if jogo.esta_solucionado():
+                    return True
+
+            if not estados.get(id_jogo):
+                estados[id_jogo] = {'visitados': [movimento], 'movimentos': jogo.get_movimentos_validos()}
+            else:
+                estados[id_jogo]['visitados'].append(movimento)
 
     return False
 
@@ -185,7 +241,8 @@ jogo = Tabuleiro()
 s_time = time.time()
 try:
     solucao = False
-    root = solucionar(jogo, 0)
+    solucionar(jogo, 0)
+    # solucionar_nao_recursivo(jogo)
     solucao = jogo.movimentos
 finally:
     e_time = time.time()
