@@ -65,7 +65,16 @@ class Movimento:
         return pos
 
 class Tabuleiro:
-    def __init__(self, pos_inicial = (3, 3)):
+    """Classe que contém tabuleiro e implementa as regras do jogo.
+    """
+    def __init__(self, pos_inicial = (3, 3), peca_final_no_buraco_inicial=True):
+        """Inicializa o tabuleiro do jogo.
+
+        Keyword Arguments:
+            pos_inicial {tuple} -- Posição onde do primeiro buraco (default: {(3, 3)})
+            peca_final_no_buraco_inicial {bool} -- Se True será exigido que a solução 
+            tenha a peça restante na mesma posição do buraco inicial (default: {True})
+        """
         self.tabuleiro = [
             [2, 2, 1, 1, 1, 2, 2],
             [2, 2, 1, 1, 1, 2, 2],
@@ -75,10 +84,12 @@ class Tabuleiro:
             [2, 2, 1, 1, 1, 2, 2],
             [2, 2, 1, 1, 1, 2, 2]
         ]
-        self.pecas_restantes = 32
         self.pos_inicial = pos_inicial
-        self.movimentos = []
         self.remover(self.pos_inicial)
+
+        self.pecas_restantes = 32
+        self.peca_final_no_buraco_inicial = True
+        self.movimentos = []
 
     def reset(self):
         """ Reseta o jogo
@@ -119,6 +130,15 @@ class Tabuleiro:
         self.tabuleiro[posicao[0]][posicao[1]] = 0
 
     def _valido(self, movimento):
+        """Verifica se um movimento é válido.
+
+        Arguments:
+            movimento {Movimento} -- movimento a ser verificado em relação ao 
+            estado atual do tabuleiro.
+
+        Returns:
+            bool -- Verdadeiro para movimento válido, e movimento inválido
+        """
         valido = True
         if not movimento:
             valido = False
@@ -136,6 +156,15 @@ class Tabuleiro:
         return valido
 
     def mover(self, movimento):
+        """Realiza o movimento se este for válido.
+
+        Arguments:
+            movimento {Movimento} -- movimento válido a ser realizado.
+
+        Returns:
+            bool -- Retorna True caso o movimento tenha sido realizado, 
+            False caso contrário
+        """
         valido = self._valido(movimento)
         if valido:
             pos_nova = movimento.nova_posicao
@@ -152,6 +181,11 @@ class Tabuleiro:
         return False
 
     def get_movimentos_validos(self):
+        """Retorna uma lista de todos os movimentos válidos.
+
+        Returns:
+            list -- Lista de instâncias válidas de Movimento
+        """
         movimentos_validos = []
         for linha, coluna in COORDS_VALIDAS:
             if self.get((linha, coluna)) == 2:
@@ -162,16 +196,32 @@ class Tabuleiro:
                     movimentos_validos.append(movimento)
         return movimentos_validos
 
-    def solucionavel(self):
+    def tem_movimentos(self):
+        """Verifica se o estado atual do tabuleiro é tem movimentos válidos.
+
+        Returns:
+            bool -- True caso o jogo tenha movimentos válidos, False caso contrário
+        """
         return len(self.get_movimentos_validos()) >= 1
 
     def esta_solucionado(self):
-        return self.pecas_restantes == 1 and self.get(self.pos_inicial) == 1
+        """Verifica se o estado atual do jogo é uma solução.
 
-    def desfazer_movimento(self, mov = None):
-        movimento = mov or self.movimentos.pop()
-        if mov:
-            self.movimentos.pop()
+        Returns:
+            bool -- True caso o jogo esteja solucionado, False caso contrário
+        """
+        solucionado = False
+        if self.peca_final_no_buraco_inicial:
+            solucionado = self.pecas_restantes == 1 and self.get(self.pos_inicial) == 1
+        else:
+            solucionado = self.pecas_restantes == 1
+        return solucionado
+
+    def desfazer_movimento(self):
+        """Desfaz o último movimento realizado.
+        """
+
+        movimento = self.movimentos.pop()
         pos_nova = movimento.nova_posicao
         pos_anterior = movimento.posicao
         peca_saltada = movimento.saltada
@@ -189,51 +239,57 @@ class Tabuleiro:
         return ident
 
 
-def solucionar(jogo, movimentos_realizados):
-    if movimentos_realizados == 31:
-        if jogo.esta_solucionado():
-            return True
+class SolucionadorResta1:
+    def __init__(self, jogo: Tabuleiro, nao_recursivo = False):
+        self.jogo = jogo
+        self.solucao = []
 
-    for linha, coluna in COORDS_VALIDAS:
-        for direcao in DIRECOES:
-            movimento = Movimento((linha, coluna), direcao)
-            if jogo.mover(movimento):
-                if solucionar(jogo, movimentos_realizados+1):
-                    return True
-                    
-                jogo.desfazer_movimento()
+    def solucionar(self, movimentos_realizados = 0):
+        if movimentos_realizados == 31:
+            if self.jogo.esta_solucionado():
+                return True
 
-    return False
+        for linha, coluna in COORDS_VALIDAS:
+            for direcao in DIRECOES:
+                movimento = Movimento((linha, coluna), direcao)
+                if self.jogo.mover(movimento):
+                    if self.solucionar(movimentos_realizados+1):
+                        self.solucao.append(movimento)
+                        return True
+                        
+                    self.jogo.desfazer_movimento()
 
-def solucionar_nao_recursivo(jogo):
-    estados = {}
-    id_inicial = jogo.ident()
-    estados[id_inicial] = {'visitados': [], 'movimentos': jogo.get_movimentos_validos()}
-    movimentos_realizados = 0
-    while estados[id_inicial]['movimentos']:
-        id_jogo = jogo.ident()
+        return False
 
-        if estados[id_jogo]['movimentos']:
-            movimento = estados[id_jogo]['movimentos'].pop()
-        else:
-            jogo.desfazer_movimento()
-            movimentos_realizados-=1
-            continue
+    def solucionar_nao_recursivo(self):
+        estados = {}
+        id_inicial = self.jogo.ident()
+        estados[id_inicial] = {'visitados': [], 'movimentos': self.jogo.get_movimentos_validos()}
+        movimentos_realizados = 0
+        while estados[id_inicial]['movimentos']:
+            id_jogo = self.jogo.ident()
 
-        if jogo.mover(movimento):
-            id_jogo = jogo.ident()
-
-            movimentos_realizados+=1
-            if movimentos_realizados == 31:
-                if jogo.esta_solucionado():
-                    return True
-
-            if not estados.get(id_jogo):
-                estados[id_jogo] = {'visitados': [movimento], 'movimentos': jogo.get_movimentos_validos()}
+            if estados[id_jogo]['movimentos']:
+                movimento = estados[id_jogo]['movimentos'].pop()
             else:
-                estados[id_jogo]['visitados'].append(movimento)
+                self.jogo.desfazer_movimento()
+                movimentos_realizados-=1
+                continue
 
-    return False
+            if self.jogo.mover(movimento):
+                id_jogo = jogo.ident()
+
+                movimentos_realizados+=1
+                if movimentos_realizados == 31:
+                    if self.jogo.esta_solucionado():
+                        return True
+
+                if not estados.get(id_jogo):
+                    estados[id_jogo] = {'visitados': [movimento], 'movimentos': self.jogo.get_movimentos_validos()}
+                else:
+                    estados[id_jogo]['visitados'].append(movimento)
+
+        return False
 
 
 jogo = Tabuleiro()
@@ -241,15 +297,15 @@ jogo = Tabuleiro()
 s_time = time.time()
 try:
     solucao = False
-    solucionar(jogo, 0)
-    # solucionar_nao_recursivo(jogo)
+    solver = SolucionadorResta1(jogo)
+    # solucinador.solucionar()
+    solver.solucionar_nao_recursivo()
     solucao = jogo.movimentos
 finally:
     e_time = time.time()
     print(f"{e_time - s_time} secs")
     print(jogo.pecas_restantes)
     if solucao:
-        # solucao.reverse()
         for mov in solucao:
             mov = str(mov).replace('N', 'cima')
             mov = str(mov).replace('O', 'esq')
