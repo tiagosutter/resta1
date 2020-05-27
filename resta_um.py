@@ -1,4 +1,14 @@
+#encoding: utf-8
+
+import argparse
 import time
+import os
+
+try:
+    import visualizacao_resta_um
+    no_pygame = False
+except ModuleNotFoundError:
+    no_pygame = True
 
 """
      N
@@ -309,7 +319,7 @@ class SolucionadorResta1:
         nop = lambda *args: None
         self.callback_visualizacao = callback_visualizacao or nop
         self.total_de_movimentos = 0
-        # self.callback_visualizacao(self)
+        self.tempo = 0
 
     def solucionar(self, recursivo=True):
         """Soluciona o jogo se possível.
@@ -322,10 +332,13 @@ class SolucionadorResta1:
         """
         self.jogo.reset()
         self.total_de_movimentos = 0
+        tempo_inicio = time.time()
         if recursivo:
-            return self._solucionar()
+            tem_solucao = self._solucionar()
         else:
-            return self._solucionar_nao_recursivo()
+            tem_solucao = self._solucionar_nao_recursivo()
+        self.tempo = time.time() - tempo_inicio
+        return tem_solucao
 
     def _solucionar(self, movimentos_realizados = 0):
         """Tenta solucionar o jogo utilizando backtracking.
@@ -401,26 +414,76 @@ class SolucionadorResta1:
         # e nenhuma solução foi encontrada
         return False
 
+
+def setup_parser_argumentos():
+    """Configura o parser de argumentos."""
+    parser_argumentos = argparse.ArgumentParser(description='Solucionador para tabuleiro inglês padrão do resta 1',
+                                                formatter_class=argparse.RawTextHelpFormatter)
+
+    parser_argumentos.add_argument('--gui', '-g', action='store_true', 
+                                   help='Usar visualização com Pygame e Tkinter')
+
+    parser_argumentos.add_argument('--recursivo', '-r', action='store_true', 
+                                   help='Usar função recursiva para solucionar')
+
+    parser_argumentos.add_argument('--posicao', '-p', nargs=2, default=[3, 3], type=int,
+                                    help='Posição inicial na forma linha coluna')
+
+    parser_argumentos.add_argument('--exigente', '-e', action='store_true', 
+                                    help='Exige que a posição final da última peça seja igual a posição do buraco inicial')
+
+    return parser_argumentos
+
+
+def exibir_config(argumentos, jogo):
+    print("\nConfiguração:")
+    recursivo = 'sim' if argumentos.recursivo else 'não'
+    print(f"Usar implementação recursiva: {recursivo}")
+
+    print(f"Posição inicial: {argumentos.posicao}")
+
+    exigente = 'sim' if argumentos.exigente else 'não'
+    print(f"Exigir peça final na posição inicial: {exigente}")
+
+    vis = 'sim' if argumentos.gui else 'não'
+    print(f"Usar visualização: {vis}\n")
+    print("Tabuleiro: ")
+    print(jogo)
+
 if __name__ == "__main__":
-    jogo = Tabuleiro()
+    parser_argumentos = setup_parser_argumentos()
+    argumentos = parser_argumentos.parse_args()
+    
+    if tuple(argumentos.posicao) not in COORDS_VALIDAS:
+        print("Posição inicial inválida")
+        os.sys.exit(1)
 
-    tempo_inicio = time.time()
-    solucao = False
-    solver = SolucionadorResta1(jogo)
-    print("Por favor aguarde!")
-    tem_solucao = solver.solucionar()
-    # tem_solucao = solver.solucionar(False)
-
-    print(f"Tempo de execução: {time.time() - tempo_inicio} secs")
-    print("Solução: ")
-    if tem_solucao:
-        for mov in jogo.movimentos:
-            # mapeia N, S, L, O para cima, baixo, direita, esquerda
-            mov = str(mov).replace('N', 'cima')
-            mov = str(mov).replace('S', 'baixo')
-            mov = str(mov).replace('L', 'direita')
-            mov = str(mov).replace('O', 'esquerda')
-            print(str(mov))
-        print(f"Total de movimentos válidos realizados para alcançar a solução: {solver.total_de_movimentos}")
+    jogo = Tabuleiro(argumentos.posicao, argumentos.exigente)
+    exibir_config(argumentos, jogo)
+    if argumentos.gui:
+        if no_pygame:
+            print('--gui ignorado por falta do modulo Pygame ou do modulo de visualização')
+        else:
+            vis = visualizacao_resta_um.Visualizacao(jogo, argumentos.recursivo)
+            vis.start()
     else:
-        print("Este jogo não tem solução.")
+        solver = SolucionadorResta1(jogo)
+
+        print("Por favor aguarde.")
+        tem_solucao = solver.solucionar(argumentos.recursivo)
+
+        print(f"Tempo de execução: {solver.tempo} segundos")
+        print("Solução: ")
+        if tem_solucao:
+            for mov in jogo.movimentos:
+                # mapeia N, S, L, O para cima, baixo, direita, esquerda
+                mov = str(mov).replace('N', 'cima')
+                mov = str(mov).replace('S', 'baixo')
+                mov = str(mov).replace('L', 'direita')
+                mov = str(mov).replace('O', 'esquerda')
+                print(str(mov))
+            print(f"Total de movimentos válidos realizados até alcançar a solução: {solver.total_de_movimentos}")
+            print("Tabuleiro final: ")
+            print(jogo)
+        else:
+            print("Este jogo não tem solução.")
