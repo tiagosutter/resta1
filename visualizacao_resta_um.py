@@ -8,7 +8,7 @@ import resta_um
 BRANCO = (255,255,255)
 PRETO = (0,0,0)
 
-TAMANHO_CELULA = 50
+TAMANHO_CELULA = 70
 
 LARGURA = 7*TAMANHO_CELULA
 ALTURA = 7*TAMANHO_CELULA
@@ -19,7 +19,8 @@ class Visualizacao:
         self.jogo = jogo
         self.recursivo = recursivo
         self.caminho = ''
-        self.delay = 1
+        self.delay = 1.0
+
         # Pygame setup
         pygame.init()
         self.surface = pygame.display.set_mode((LARGURA, ALTURA))
@@ -31,19 +32,28 @@ class Visualizacao:
 
         # Tkinter setup
         self.root = tk.Tk()
+        self.root.title('Caminho')
         self.text_box_caminho = tk.Text(self.root, height=32, width=30)
+        self.text_box_caminho.config(font=('Consolas', 12))
         self.text_box_caminho.pack()
-        self.root.geometry('+450+100')
+
+        self.status_var = tk.StringVar()
+        self.statusbar = tk.Label(self.root, textvariable=self.status_var)
+        self.statusbar.config(font=('Arial', 12, 'bold'))
+        self.statusbar.pack(side=tk.LEFT)
+
+        self.root.geometry('+670+30')
     
     def start(self):
         self.ler_tabuleiro(self.jogo.tabuleiro)
         solver = resta_um.SolucionadorResta1(self.jogo, callback_visualizacao=self.callback_exibir)
-        solverThread = Thread(target=solver.solucionar, kwargs={'recursivo': self.recursivo}, name="Principal", daemon=True)
+        solverThread = Thread(target=solver.solucionar, kwargs={'recursivo': self.recursivo}, name="Solucionador", daemon=True)
         solverThread.start()
         self.root.after(100, self.atualizar_tk_e_pygame)
         self.root.mainloop()
 
     def atualizar_tk_e_pygame(self):
+        self.status_var.set(f"Delay: {self.delay}")
         texto = self.caminho
         self.text_box_caminho.delete('1.0', tk.END)
         self.text_box_caminho.insert(tk.END, texto)
@@ -53,6 +63,14 @@ class Visualizacao:
                 pygame.quit()
                 self.root.quit()
                 sys.exit()
+            elif evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_LEFT:
+                    if round(self.delay - 0.1, 1) > 0:
+                        self.delay = round(self.delay - 0.1, 1)
+                if evento.key == pygame.K_RIGHT:
+                    if round(self.delay + 0.1, 1) <= 5:
+                        self.delay = round(self.delay + 0.1, 1)
+
         pygame.display.update()
 
     def desenhar_celulas(self):
