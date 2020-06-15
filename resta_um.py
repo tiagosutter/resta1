@@ -137,7 +137,10 @@ class Tabuleiro:
         self.pos_inicial = pos_inicial
         self.remover(self.pos_inicial)
 
-        self.pecas_restantes = 32
+        self.pecas_restantes = 0
+        for linha in self.tabuleiro:
+            self.pecas_restantes += linha.count(1)
+
         self.peca_final_no_buraco_inicial = peca_final_no_buraco_inicial
 
         # pilha de movimentos realizados
